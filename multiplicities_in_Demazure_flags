@@ -1,0 +1,93 @@
+def minus(p):
+    """
+    If "p" is the partition (p_1 \geq ...\geq p_n), return the partition (p_1 \geq...\geq p_{n-2}\geq p_{n-1}-p_n). 
+    """
+    if len(p) < 2:
+        raise ValueError("must have length at least 2")
+    a = list(p)
+    v = a.pop()
+    a[-1] -= v
+    return Partition(a)
+
+def plus(p):
+    """
+    If "p" is the partition (p_1 \geq ...\geq p_n), return the partition obtained by reordering the tuple 
+    (p_1,...,p_{n-2},p_{n-1}+1,p_n-1). 
+    """
+    
+    if len(p) < 2:
+        raise ValueError("must have length at least 2")
+    a = list(p)
+    a[-2] += 1
+    a[-1] -= 1
+    return Partition(sorted(a, reverse=True))
+
+def is_bad(p, a):
+    """
+    Return 'yes' if p is a special fat hook partition or rectangular partition with maximal part \leq a,  
+    otherwise return 'No'. 
+    """
+    if a is None:
+        return len(p) <= 1
+
+    y = filter(lambda x: x!=0, p.to_exp())
+    return (((len(y) == 2 and y[0] == 1) or len(y) == 1) and p[0] == a) \
+            or (len(p) == 1 and p[0] <= a) or len(p) <= 1
+
+def construct_digraph(p, a=None, q=None):
+    """
+    INPUT:
+
+    - ``p`` -- the partition
+    - ``q`` -- the value of `q` to use in the latex edge labels
+    Construct a digraph whose vertices are partitions and edges are 
+    from the partition 'p' to 'minus(p)' and 'plus(p)'.
+    
+    """
+    p = Partition(p) # Make sure it is a partition
+
+    # Construct the DiGraph
+    G = DiGraph()
+    todo = set([p])
+    visited = set([p])
+    edge_colors = {}
+    while len(todo) != 0:
+        cur = todo.pop()
+        if is_bad(cur, a):
+            continue
+        np = plus(cur)
+        nm = minus(cur)
+        G.add_edge([cur, np, '+'])
+        G.add_edge([cur, nm, '-'])
+        if np not in visited:
+            todo.add(np)
+        if nm not in visited:
+            todo.add(nm)
+    return G
+
+def sub_digraph(p, a, q=None):
+    """
+    Delete all the edges from the digraph obtained from the function 'construct_digraph' whose source is special 
+    fat hook partition or a rectangular partition with maximal part \leq a. 
+    """
+    G1 = construct_digraph(p, q=q)
+    for x in G1.edges():
+        if is_bad(x[0], a):
+            G1.delete_multiedge(x[0], x[1])
+    return G1
+
+def full(p, i, a=None, q=None):
+    """
+    Reutrn a polynomial in 'q' which is the weighted sum of all paths from the partition 'p' to the partition 'i'
+    in the sub_digraph(p) where the weight of an edge from partion 'p' to 'plus(p)' is one and weight of an edge 
+    from partion 'p' to 'minus(p)' is (n-1)*p_n if 'p' is the partition (p_1\geq,\cdots,\geq p_n). 
+    """
+    
+    p = Partition(p) # Make sure it is a partition
+    if q is None:
+        return len(construct_digraph(p, a).all_paths(p, Partition(i)))
+    G = construct_digraph(p, a, q)
+    R = q.parent()
+    return R.sum( R.prod(q**(u[-1]*(len(u)-1)) for j,u in enumerate(path[:-1])
+                         if G.edge_label(u, path[j+1]) == '-')
+                  for path in G.all_paths(p, Partition(i)) )
